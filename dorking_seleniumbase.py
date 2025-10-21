@@ -1,12 +1,13 @@
-#!/usr/bin/env python3
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 import os
 import time
 import sys
+import tempfile
 
 # Paramètres via variables d'environnement
 dork = os.getenv("QUERY", 'intext:"SQL syntax near" | intext:"syntax error has occurred"')
@@ -16,8 +17,12 @@ query = f"{dork} site:{domain}"
 def main():
     driver = None
     try:
-        # Configuration du pilote Chrome (automatique via webdriver_manager)
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        # Configuration du pilote Chrome avec un répertoire unique
+        chrome_options = Options()
+        user_data_dir = tempfile.mkdtemp()  # Crée un répertoire temporaire unique
+        chrome_options.add_argument(f"user-data-dir={user_data_dir}")
+        
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
         
         # Ouvre Google
         driver.get("https://www.google.com/ncr")  # /ncr évite la redirection locale
@@ -30,20 +35,20 @@ def main():
             time.sleep(2)  # Attend que la page se recharge
         except Exception:
             print("Aucun bouton de cookies trouvé ou clic échoué, continuation...")
-        
+       
         # Recherche
         try:
             search_box = driver.find_element(By.NAME, "q")  # Barre de recherche
             search_box.send_keys(query)
             search_box.send_keys(Keys.RETURN)
             time.sleep(3)  # Attente pour charger les résultats
-            
+           
             # Détection de CAPTCHA
             if "sorry" in driver.current_url:
                 print("CAPTCHA détecté — arrêt.")
                 driver.save_screenshot("captcha_detected.png")
                 return
-            
+           
             # Extraction des titres
             titles = driver.find_elements(By.TAG_NAME, "h3")
             if titles:
@@ -59,10 +64,10 @@ def main():
             print(f"Erreur lors de la recherche : {e}")
             driver.save_screenshot("error_search.png")
             raise
-        
+       
         # Capture finale
         driver.save_screenshot("results.png")
-    
+   
     except Exception as exc:
         print(f"Erreur principale : {exc}", file=sys.stderr)
         try:
@@ -71,7 +76,7 @@ def main():
         except Exception:
             pass
         raise
-    
+   
     finally:
         if driver:
             driver.quit()
